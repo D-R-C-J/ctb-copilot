@@ -29,4 +29,27 @@ def rank_semantic(query: str, index, model, limit: int=3) -> list[dict]:
     rank.sort(key=lambda item: item["score"], reverse=True)
     return rank[:limit]
 
-    
+    # takes semantic ranking, passages and limit and return an ordered list of passage ids
+def expand_linked_evidence(semantic_ranking, passages, limit) -> list:
+    if not semantic_ranking or limit <= 0: return []
+    passages_by_id = {p["id"]: p for p in passages}
+    first_id = semantic_ranking[0]["id"]
+    ordered_list = [first_id]
+    seen = {first_id}
+
+    first_passage = passages_by_id.get(first_id)
+    if first_passage is not None and first_passage["document_type"] == "CTB":
+        matched_mbft = [p["id"] for p in passages if p["document_type"] == "MBFT" and p.get("ctb_passage_id") == first_id]
+
+        if len(matched_mbft) == 1 and len(ordered_list) < limit:
+            ordered_list.append(matched_mbft[0])
+            seen.add(matched_mbft[0])
+    for item in semantic_ranking[1:]:
+        if len(ordered_list) >= limit:
+            break
+        passage_id = item["id"]
+        if passage_id not in seen:
+            ordered_list.append(passage_id)
+            seen.add(passage_id)
+
+    return ordered_list
