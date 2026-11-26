@@ -60,7 +60,9 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
             "text": text_by_id.get(r["id"]),
         })
     for f in final:
-        print(f"{f}\n")
+        score_display = ("incluída pelo vínculo com o CTB" if f["score"] is None else f["score"]) 
+        displayed = {**f, "score": score_display}
+        print(f"{displayed}\n")
     return final
     
 
