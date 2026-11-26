@@ -3,6 +3,7 @@ import json
 REQUIRED_FIELDS = ["id", "document_type", "locator", "url", "source_version", "verified_on", "text"]
 DOCUMENT_TYPES = ["CTB", "MBFT"]
 
+# Reads JSONL file containing CTB and MBFT records, validates every records schema and returns the records as list[dict]
 def load_passages(file_path: str) -> list[dict]:
     passages: list[dict] = []
     with open(file_path, "r", encoding="utf-8") as f:

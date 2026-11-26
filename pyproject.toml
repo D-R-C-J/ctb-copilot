@@ -7,7 +7,9 @@ authors = [
     { name = "D-R-C-J", email = "186314764+D-R-C-J@users.noreply.github.com" }
 ]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "sentence-transformers>=6.3.0",
+]
 
 [project.scripts]
 ctb-copilot = "ctb_copilot:main"

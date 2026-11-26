@@ -15,3 +15,6 @@ def rank_lexical(query: str, passages: list[dict], limit: int = 5) -> list[dict]
             rank.append({"id": passage["id"], "score": count})
     rank.sort(key=lambda item: item["score"], reverse=True)
     return rank[:limit]
+
+def rank_semantic():
+    pass
