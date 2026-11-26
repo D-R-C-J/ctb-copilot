@@ -1,5 +1,5 @@
 import argparse
-from .search import rank_lexical, rank_semantic, expand_linked_evidence
+from .search import rank_lexical, rank_semantic, expand_linked_evidence, rank_hybrid
 from .index import build_index
 from sentence_transformers import SentenceTransformer
 
@@ -22,9 +22,9 @@ def build_parser() -> argparse.ArgumentParser:
         "-m",
         "--method",
         type=str,
-        choices=["lexical", "semantic", "linked"],
+        choices=["lexical", "semantic", "hybrid", "linked"],
         default="lexical",
-        help="Search method to use: lexical, semantic or linked (default: lexical)"
+        help="Search method to use: lexical, semantic, hybrid or linked (default: lexical)"
     )
     return parser
 
@@ -37,6 +37,12 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
             results = rank_semantic(args.query, idx, model, 3)
+        case "hybrid":
+            lex = rank_lexical(args.query, passages, 7)
+            model = SentenceTransformer("intfloat/multilingual-e5-small")
+            idx = build_index(passages, model)
+            sem = rank_semantic(args.query, idx, model, 3)
+            results = rank_hybrid(lex, sem, 3)
         case "linked":
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
