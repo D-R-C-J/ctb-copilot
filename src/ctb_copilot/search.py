@@ -29,6 +29,22 @@ def rank_semantic(query: str, index, model, limit: int=3) -> list[dict]:
     rank.sort(key=lambda item: item["score"], reverse=True)
     return rank[:limit]
 
+def rank_hybrid(lexical: list[dict], semantic: list[dict], limit: int = 3) -> list[dict]:
+    totals: dict = {}
+    records: list = []
+    for ranks in (lexical, semantic):
+        for position, hit in enumerate(ranks, 1):
+            if totals.get(hit["id"], 0) == 0:
+                totals[hit["id"]] = 0
+            totals[hit["id"]] += 1 / position
+    sorted_totals_pairs = sorted(totals.items(), key=lambda x: x[1], reverse=True)
+    for i, k in sorted_totals_pairs:
+        records.append({"id": i, "score": k})
+    return records[:limit]
+
+            
+
+
     # takes semantic ranking, passages and limit and return an ordered list of passage ids
 def expand_linked_evidence(semantic_ranking, passages, limit) -> list:
     if not semantic_ranking or limit <= 0: return []

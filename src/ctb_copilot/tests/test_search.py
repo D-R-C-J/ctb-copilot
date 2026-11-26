@@ -1,4 +1,4 @@
-from ctb_copilot.search import rank_lexical, expand_linked_evidence, rank_semantic
+from ctb_copilot.search import expand_linked_evidence, rank_hybrid, rank_lexical, rank_semantic
 from ctb_copilot.corpus import load_passages
 import pytest
 import pathlib
@@ -83,3 +83,12 @@ def test_rank_semantic_rejects_mismatched_dimensions(semantic_inputs):
 
     with pytest.raises(ValueError, match="Query's vector numbers quantity"):
         rank_semantic("piloto sem capacete", mismatched_index, model)
+
+
+def test_rank_hybrid_combines_rankings_and_applies_limit():
+    lexical = [{"id": "A", "score": 5}, {"id": "B", "score": 2}]
+    semantic = [{"id": "B", "score": 0.9}, {"id": "C", "score": 0.7}]
+
+    results = rank_hybrid(lexical, semantic, limit=2)
+
+    assert results == [{"id": "B", "score": 1.5}, {"id": "A", "score": 1.0}]
