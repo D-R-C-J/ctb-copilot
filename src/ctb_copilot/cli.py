@@ -1,5 +1,7 @@
 import argparse
-from .search import rank_lexical
+from .search import rank_lexical, rank_semantic
+from .index import build_index
+from sentence_transformers import SentenceTransformer
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -20,7 +22,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_cli(passages: list[dict]):
     args = build_parser().parse_args()
-    results = rank_lexical(args.query, passages, 3)
+    #model = SentenceTransformer("intfloat/multilingual-e5-small")
+    #idx = build_index(passages, model)
+    results = rank_lexical(args.query, passages, 7)
     final = []
     if not results:
         no_result = "Nenhum resultado encontrado."
