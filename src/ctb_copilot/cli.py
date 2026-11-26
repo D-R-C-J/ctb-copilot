@@ -41,7 +41,7 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
             lex = rank_lexical(args.query, passages, 7)
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
-            sem = rank_semantic(args.query, idx, model, 3)
+            sem = rank_semantic(args.query, idx, model, 7)
             results = rank_hybrid(lex, sem, 3)
         case "linked":
             model = SentenceTransformer("intfloat/multilingual-e5-small")
