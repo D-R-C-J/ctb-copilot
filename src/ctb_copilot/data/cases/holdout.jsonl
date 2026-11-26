@@ -1,0 +1,4 @@
+{"id":"case-005","observation":"Uma mulher saiu pilotando a motoneta com a cabeça descoberta e o capacete pendurado no cotovelo.","expected_outcome":"candidate","expected_passage_ids":["ctb-244-i","mbft-703-01"]}
+{"id":"case-006","observation":"Na corrida de mototáxi, o piloto levava um cliente com capacete. O colete de segurança do piloto estava totalmente coberto por uma jaqueta fechada.","expected_outcome":"candidate","expected_passage_ids":["ctb-244-i","mbft-703-03"]}
+{"id":"case-007","observation":"Da janela, vi uma pessoa sem capacete sentada ao guidão de uma motoneta. Um ônibus encobria parte da cena e não sei dizer se ela estava pilotando ou se a motoneta estava estacionada.","expected_outcome":"ask_clarification","missing_fact":"Se a pessoa estava conduzindo a motoneta."}
+{"id":"case-008","observation":"Um carro atravessou o cruzamento enquanto o semáforo à sua frente estava vermelho.","expected_outcome":"insufficient_evidence"}
