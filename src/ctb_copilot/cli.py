@@ -1,7 +1,42 @@
 import argparse
 from .search import rank_lexical, rank_semantic, expand_linked_evidence, rank_hybrid
 from .index import build_index
+from .gemini import generate_assessment
+from .assessment import validate_citations
+from google import genai
 from sentence_transformers import SentenceTransformer
+from dotenv import load_dotenv
+import os
+
+### PARSER HELPERs ###
+
+def add_query(parser):
+    parser.add_argument(
+        "query",
+        type=str,
+        help="Traffic scenario, legal keywords etc."
+    )
+
+def add_method(parser, default_method: str = "lexical"):
+    parser.add_argument(
+        "-m",
+        "--method",
+        type=str,
+        choices=["lexical", "semantic", "hybrid", "linked"],
+        default=default_method,
+        help=f"Search method to use: lexical, semantic, hybrid or linked (default: {default_method})"
+    )
+
+def add_limit(parser, default_limit: int = 3):
+    parser.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        default=default_limit,
+        help=f"Limit results for the search (default: {default_limit})."
+    )
+
+###########################################################################
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -13,26 +48,16 @@ def build_parser() -> argparse.ArgumentParser:
         "search",
         help="Search CTB and MBFT.",
     )
-    search_parser.add_argument(
-        "query",
-        type=str,
-        help="Traffic scenario, legal keywords etc."
+    ask_parser = subparser.add_parser(
+        "ask",
+        help="Use Gemini API for the search."
     )
-    search_parser.add_argument(
-        "-m",
-        "--method",
-        type=str,
-        choices=["lexical", "semantic", "hybrid", "linked"],
-        default="lexical",
-        help="Search method to use: lexical, semantic, hybrid or linked (default: lexical)"
-    )
-    search_parser.add_argument(
-        "-l",
-        "--limit",
-        type=int,
-        default=3,
-        help="Limit results for the search (default: 3)."
-    )
+    add_query(search_parser)
+    add_query(ask_parser)
+    add_method(search_parser)
+    add_method(ask_parser, "semantic")
+    add_limit(search_parser)
+    add_limit(ask_parser, 5)
     return parser
 
 def run_cli(passages: list[dict], argv: list[str] | None = None):
@@ -65,6 +90,7 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
         print(no_result)
         return
     locators_by_id = {p["id"]: p.get("locator") for p in passages}
+    urls_by_id = {p["id"]: p.get("url") for p in passages}
     text_by_id = {p["id"]: p.get("text") for p in passages}
     for r in results:
         final.append({
@@ -73,10 +99,58 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
             "locator": locators_by_id.get(r["id"]),
             "text": text_by_id.get(r["id"]),
         })
-    for f in final:
-        score_display = ("incluída pelo vínculo com o CTB" if f["score"] is None else f["score"]) 
-        displayed = {**f, "score": score_display}
-        print(f"{displayed}\n")
-    return final
-    
 
+    match args.command:
+        case "search":
+            for f in final:
+                score_display = ("incluída pelo vínculo com o CTB" if f["score"] is None else f["score"]) 
+                displayed = {**f, "score": score_display}
+                print(f"{displayed}\n")
+            return final
+        case "ask":
+            load_dotenv()
+            api_key = os.environ["GEMINI_API_KEY"]
+            if not api_key:
+                raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
+            client = genai.Client(api_key=api_key)
+            assessment = generate_assessment(args.query, final, client, os.environ["GEMINI_MODEL_NAME"])
+            
+            ctb_id = assessment["ctb_passage_id"]
+            mbft_id = assessment["mbft_passage_id"]
+            usage = assessment.get("usage", {})
+            tokens_line = (
+                f"Tokens -> entrada: {usage.get('input_tokens', 0)} | "
+                f"saída: {usage.get('output_tokens', 0)} | "
+                f"total: {usage.get('total_tokens', 0)}"
+            )
+
+            if not ctb_id and not mbft_id:
+                print(
+                    f"Nenhum enquadramento suportado encontrado.\n{assessment['explanation']}"
+                    f"{tokens_line}"
+                )
+                return None
+            
+            cited_ids = [ctb_id, mbft_id]
+            final_ids_sent = [item["id"] for item in final]
+            if not validate_citations(cited_ids, final_ids_sent):
+                raise ValueError("The assessment could not be verified against retrieved evidence.")
+
+            ctb_locator = locators_by_id.get(ctb_id)
+            mbft_locator = locators_by_id.get(mbft_id)
+            ctb_url = urls_by_id.get(ctb_id)
+            mbft_url = urls_by_id.get(mbft_id)
+
+            print(
+                f"{assessment['explanation']}\n"
+                f"Fontes: {ctb_locator} ({ctb_id}) ({ctb_url}) | {mbft_locator} ({mbft_id}) ({mbft_url})\n"
+                f"{tokens_line}"
+            )
+
+            return {
+                **assessment,
+                "ctb_locator": ctb_locator,
+                "ctb_url": ctb_url,
+                "mbft_locator": mbft_locator,
+                "mbft_url": mbft_url     
+            }
