@@ -26,29 +26,37 @@ def build_parser() -> argparse.ArgumentParser:
         default="lexical",
         help="Search method to use: lexical, semantic, hybrid or linked (default: lexical)"
     )
+    search_parser.add_argument(
+        "-l",
+        "--limit",
+        type=int,
+        default=3,
+        help="Limit results for the search (default: 3)."
+    )
     return parser
 
 def run_cli(passages: list[dict], argv: list[str] | None = None):
     args = build_parser().parse_args(argv)
     match args.method:
         case "lexical":
-            results = rank_lexical(args.query, passages, 3)
+            results = rank_lexical(args.query, passages, args.limit)
         case "semantic":
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
-            results = rank_semantic(args.query, idx, model, 3)
+            results = rank_semantic(args.query, idx, model, args.limit)
         case "hybrid":
-            lex = rank_lexical(args.query, passages, 7)
+            pool_size = max(7, args.limit)
+            lex = rank_lexical(args.query, passages, pool_size)
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
-            sem = rank_semantic(args.query, idx, model, 7)
-            results = rank_hybrid(lex, sem, 3)
+            sem = rank_semantic(args.query, idx, model, pool_size)
+            results = rank_hybrid(lex, sem, args.limit)
         case "linked":
             model = SentenceTransformer("intfloat/multilingual-e5-small")
             idx = build_index(passages, model)
             rs = rank_semantic(args.query, idx, model, 3)
             scores_by_id = {item["id"]: item["score"] for item in rs}
-            ordered_ids = expand_linked_evidence(rs, passages, 3)
+            ordered_ids = expand_linked_evidence(rs, passages, args.limit)
             results = [{"id": pid, "score": scores_by_id.get(pid)} for pid in ordered_ids]
     
     final = []
