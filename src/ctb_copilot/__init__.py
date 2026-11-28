@@ -9,7 +9,5 @@ def main() -> None:
     path = pathlib.Path(__file__).parent / "data" / "passages.jsonl"
     passages = load_passages(path)
     print(f"Loaded {len(passages)} passages successfully.")
-    rank = run_cli(passages)
-    #model = SentenceTransformer("intfloat/multilingual-e5-small")
-    #build_index(passages, model)
+    run_cli(passages)
 
