@@ -1,17 +1,45 @@
 from google import genai
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, TypeAdapter
 import json
+from typing import Literal, Union, Annotated
 
-class AssessmentSchema(BaseModel):
+class CandidateAssessment(BaseModel):
+    outcome: Literal["candidate"]
     ctb_passage_id: str = Field(
-        description="ID of the matching CTB passage from the provided evidence (or empty string if none applies)."
+        description="ID of the matching CTB passage from the provided evidence."
     )
     mbft_passage_id: str = Field(
-        description="ID of the matching MBFT passage from the provided evidence (or empty string if none applies)."
+        description="ID of the matching MBFT passage from the provided evidence."
     )
     explanation: str = Field(
         description="Concise justification grounded strictly in the provided evidence."
     )
+
+
+class ClarificationAssessment(BaseModel):
+    outcome: Literal["ask_clarification"]
+    question: str = Field(
+        description="A specific question in Portuguese about the missing fact needed to classify the observation."
+    )
+
+
+class InsufficientEvidenceAssessment(BaseModel):
+    outcome: Literal["insufficient_evidence"]
+    explanation: str = Field(
+        description="Explanation in Portuguese of what the supplied sources do not cover."
+    )
+
+
+AssessmentResponse = Annotated[
+    Union[
+        CandidateAssessment,
+        ClarificationAssessment,
+        InsufficientEvidenceAssessment,
+    ],
+    Field(discriminator="outcome"),
+]
+
+ASSESSMENT_ADAPTER = TypeAdapter(AssessmentResponse)
 
 def generate_assessment(obs: str, passages: list[dict], client: genai.Client, model_name: str = "gemini-3.5-flash-lite") -> dict:
     evidence: list[dict] = []
@@ -21,13 +49,19 @@ def generate_assessment(obs: str, passages: list[dict], client: genai.Client, mo
     input_json = json.dumps(input_dict)
     task_instruction = (
         "Você é um assistente de apoio à decisão na fiscalização de trânsito. "
-        "Considere os fatos relatados na observação e use apenas as passagens fornecidas "
-        "como evidência para propor uma possível classificação. "
-        "Se houver evidência suficiente, selecione o ID de uma passagem do CTB e o ID de uma "
-        "ficha do MBFT que, juntos, sustentem a proposta. "
-        "Caso contrário, deixe ambos os IDs como strings vazias e explique o que falta. "
-        "Escreva o campo explanation em português do Brasil. Ao propor uma classificação, "
-        "explique como um fato específico da observação se relaciona com as passagens selecionadas."
+        "Use apenas os fatos da observação e as passagens fornecidas. "
+        "Identifique condutor e passageiro, pois pode influenciar na infração. "
+        "Responda em português do Brasil.\n\n"
+        "Escolha o outcome seguindo esta ordem:\n"
+        "- ask_clarification: se faltar um fato que possa mudar o enquadramento, escolha este "
+        "resultado mesmo que alguma passagem pareça relevante. No campo question, faça uma "
+        "pergunta direta sobre o fato que falta.\n"
+        "- candidate: se os fatos forem suficientes e uma passagem do CTB e uma ficha do MBFT "
+        "sustentarem juntas a proposta, copie os dois IDs exatamente como aparecem no campo id "
+        "das passagens fornecidas. Relacione um fato da observação às passagens em explanation.\n"
+        "- insufficient_evidence: se os fatos forem suficientes, mas as passagens fornecidas "
+        "não sustentarem uma proposta, descreva essa lacuna no campo explanation.\n\n"
+        "Inclua ctb_passage_id e mbft_passage_id apenas em candidate."
     )
     interaction = client.interactions.create(
         model = model_name,
@@ -36,11 +70,11 @@ def generate_assessment(obs: str, passages: list[dict], client: genai.Client, mo
         response_format={
             "type": "text",
             "mime_type": "application/json",
-            "schema": AssessmentSchema.model_json_schema()
+            "schema": ASSESSMENT_ADAPTER.json_schema()
         },
     )
 
-    assessment = AssessmentSchema.model_validate_json(interaction.output_text)
+    assessment = ASSESSMENT_ADAPTER.validate_json(interaction.output_text)
 
     usage = interaction.usage
     result = assessment.model_dump()

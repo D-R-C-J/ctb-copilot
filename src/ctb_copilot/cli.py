@@ -115,42 +115,50 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
             client = genai.Client(api_key=api_key)
             assessment = generate_assessment(args.query, final, client, os.environ["GEMINI_MODEL_NAME"])
             
-            ctb_id = assessment["ctb_passage_id"]
-            mbft_id = assessment["mbft_passage_id"]
+           
             usage = assessment.get("usage", {})
             tokens_line = (
                 f"Tokens -> entrada: {usage.get('input_tokens', 0)} | "
                 f"saída: {usage.get('output_tokens', 0)} | "
                 f"total: {usage.get('total_tokens', 0)}"
             )
-
-            if not ctb_id and not mbft_id:
-                print(
-                    f"Nenhum enquadramento suportado encontrado.\n{assessment['explanation']}"
-                    f"{tokens_line}"
-                )
-                return None
             
-            cited_ids = [ctb_id, mbft_id]
-            final_ids_sent = [item["id"] for item in final]
-            if not validate_citations(cited_ids, final_ids_sent):
-                raise ValueError("The assessment could not be verified against retrieved evidence.")
+            match assessment["outcome"]:
+                case "ask_clarification":
+                    print(
+                        f"Pedir mais detalhes: {assessment["question"]}\n"
+                        f"{tokens_line}"
+                    )
+                    return assessment
+                case "insufficient_evidence":
+                    print(
+                        f"Evidências insuficientes: {assessment["explanation"]}\n"
+                        f"{tokens_line}"
+                    )
+                    return assessment
+                case "candidate":
+                    ctb_id = assessment["ctb_passage_id"]
+                    mbft_id = assessment["mbft_passage_id"]
+                    cited_ids = [ctb_id, mbft_id]
+                    final_ids_sent = [item["id"] for item in final]
+                    if not validate_citations(cited_ids, final_ids_sent):
+                        raise ValueError("The assessment could not be verified against retrieved evidence.")
 
-            ctb_locator = locators_by_id.get(ctb_id)
-            mbft_locator = locators_by_id.get(mbft_id)
-            ctb_url = urls_by_id.get(ctb_id)
-            mbft_url = urls_by_id.get(mbft_id)
+                    ctb_locator = locators_by_id.get(ctb_id)
+                    mbft_locator = locators_by_id.get(mbft_id)
+                    ctb_url = urls_by_id.get(ctb_id)
+                    mbft_url = urls_by_id.get(mbft_id)
 
-            print(
-                f"{assessment['explanation']}\n"
-                f"Fontes: {ctb_locator} ({ctb_id}) ({ctb_url}) | {mbft_locator} ({mbft_id}) ({mbft_url})\n"
-                f"{tokens_line}"
-            )
+                    print(
+                        f"{assessment['explanation']}\n"
+                        f"Fontes: {ctb_locator} ({ctb_id}) ({ctb_url}) | {mbft_locator} ({mbft_id}) ({mbft_url})\n"
+                        f"{tokens_line}"
+                    )
 
-            return {
-                **assessment,
-                "ctb_locator": ctb_locator,
-                "ctb_url": ctb_url,
-                "mbft_locator": mbft_locator,
-                "mbft_url": mbft_url     
-            }
+                    return {
+                        **assessment,
+                        "ctb_locator": ctb_locator,
+                        "ctb_url": ctb_url,
+                        "mbft_locator": mbft_locator,
+                        "mbft_url": mbft_url     
+                    }
