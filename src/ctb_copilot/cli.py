@@ -114,7 +114,9 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
                 raise RuntimeError("OPENROUTER_API_KEY environment variable not set")
             client = genai.Client(api_key=api_key)
             assessment = generate_assessment(args.query, final, client, os.environ["GEMINI_MODEL_NAME"])
-            
+
+            retrieved_ids = [i["id"] for i in final]
+            assessment["retrieved_ids"] = retrieved_ids
            
             usage = assessment.get("usage", {})
             tokens_line = (
@@ -140,8 +142,8 @@ def run_cli(passages: list[dict], argv: list[str] | None = None):
                     ctb_id = assessment["ctb_passage_id"]
                     mbft_id = assessment["mbft_passage_id"]
                     cited_ids = [ctb_id, mbft_id]
-                    final_ids_sent = [item["id"] for item in final]
-                    if not validate_citations(cited_ids, final_ids_sent):
+                    
+                    if not validate_citations(cited_ids, retrieved_ids):
                         raise ValueError("The assessment could not be verified against retrieved evidence.")
 
                     ctb_locator = locators_by_id.get(ctb_id)

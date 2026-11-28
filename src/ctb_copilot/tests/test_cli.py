@@ -58,7 +58,9 @@ def test_ask_prints_candidate_sources(passages, fake_generation, capsys):
 
     observation, evidence, _, model_name = fake_generation.call_args.args
     assert observation == "capacete"
-    assert [passage["id"] for passage in evidence] == ["ctb-a", "mbft-a"]
+    sent_ids = [passage["id"] for passage in evidence]
+    assert sent_ids == ["ctb-a", "mbft-a"]
+    assert result["retrieved_ids"] == sent_ids
     assert model_name == "fake-model"
     assert result["ctb_url"] == passages[0]["url"]
     assert result["mbft_url"] == passages[1]["url"]
@@ -78,11 +80,11 @@ def test_ask_prints_candidate_sources(passages, fake_generation, capsys):
     ],
 )
 def test_ask_displays_non_candidate_response(passages, fake_generation, capsys, response, message):
-    fake_generation.return_value = response
+    fake_generation.return_value = response.copy()
 
     result = cli.run_cli(passages, ["ask", "capacete", "--method", "lexical"])
 
-    assert result == response
+    assert result == {**response, "retrieved_ids": ["ctb-a", "mbft-a"]}
     output = capsys.readouterr().out
     assert message in output
     assert "Fontes:" not in output
